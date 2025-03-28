@@ -12,6 +12,8 @@ const errorMessage = ref('');
 const token = ref('');
 const isScriptLoaded = ref(false);
 const currentPage = ref('deposit');
+const paymentMethod = ref('direct');
+const successMessage = ref('');
 
 const setInitialToken = async () => {
     try {
@@ -53,19 +55,40 @@ const createPayment = async () => {
     }
 
     loading.value = true;
+    errorMessage.value = '';
+    successMessage.value = '';
+    
     try {
         const currentDateTime = new Date().toISOString().slice(0, 19).replace('T', ' ');
-        const response = await api.post('/deposit', {
+        const payload = {
             order_id: orderId.value,
             amount: parseInt(amount.value),
             timestamp: currentDateTime
-        });
-        console.log(response.data.data.snap_token);
-        snapToken.value = response.data.data.snap_token;
-        await payNow();
+        };
+        
+        if (paymentMethod.value === 'midtrans') {
+            // Proses pembayaran Midtrans
+            const response = await api.post('/deposit', payload);
+            snapToken.value = response.data.data.snap_token;
+            await payNow();
+        } else {
+            // Proses pembayaran manual/langsung
+            const response = await api.post('/deposit/manual', payload);
+            
+            // Reset form dan tampilkan pesan sukses
+            amount.value = '';
+            errorMessage.value = '';
+            successMessage.value = 'Deposit berhasil ditambahkan!';
+            await generateOrderId(); // Generate order ID baru
+            
+            // Clear success message after 3 seconds
+            setTimeout(() => {
+                successMessage.value = '';
+            }, 3000);
+        }
     } catch (error) {
         console.error('Error creating payment:', error);
-        errorMessage.value = 'Gagal membuat pembayaran';
+        errorMessage.value = error.response?.data?.message || 'Gagal membuat pembayaran';
     } finally {
         loading.value = false;
     }
@@ -184,13 +207,34 @@ onMounted(async () => {
 
         <!-- Deposit Form -->
         <div v-if="currentPage === 'deposit'">
-            <h1>Pembayaran Deposit Midtrans</h1>
+            <h1>Pembayaran Deposit</h1>
             
-            <div v-if="!isScriptLoaded" class="alert warning">
+            <div v-if="!isScriptLoaded && paymentMethod === 'midtrans'" class="alert warning">
                 Memuat komponen pembayaran...
             </div>
             
             <div class="payment-form">
+                <!-- Payment Method Selection -->
+                <div class="form-group">
+                    <label>Metode Pembayaran:</label>
+                    <div class="payment-method-buttons">
+                        <button 
+                            :class="{ active: paymentMethod === 'direct' }"
+                            @click="paymentMethod = 'direct'"
+                            type="button"
+                        >
+                            Pembayaran Langsung
+                        </button>
+                        <button 
+                            :class="{ active: paymentMethod === 'midtrans' }"
+                            @click="paymentMethod = 'midtrans'"
+                            type="button"
+                        >
+                            Midtrans
+                        </button>
+                    </div>
+                </div>
+
                 <div class="form-group">
                     <label>Order ID:</label>
                     <input type="text" v-model="orderId" readonly />
@@ -206,13 +250,15 @@ onMounted(async () => {
                     />
                 </div>
 
+                <p class="success-message" v-if="successMessage">{{ successMessage }}</p>
                 <p class="error-message" v-if="errorMessage">{{ errorMessage }}</p>
 
                 <button 
                     @click="createPayment" 
                     :disabled="loading || !orderId || !amount"
+                    class="submit-button"
                 >
-                    {{ loading ? 'Memproses...' : 'Bayar Sekarang' }}
+                    {{ loading ? 'Memproses...' : (paymentMethod === 'direct' ? 'Deposit Sekarang' : 'Bayar dengan Midtrans') }}
                 </button>
             </div>
         </div>
@@ -311,5 +357,38 @@ button:disabled {
 .nav-buttons button:hover {
     background-color: #4CAF50;
     color: white;
+}
+
+.payment-method-buttons {
+    display: flex;
+    gap: 10px;
+    margin-top: 5px;
+}
+
+.payment-method-buttons button {
+    flex: 1;
+    background-color: white;
+    color: #4CAF50;
+    border: 1px solid #4CAF50;
+    padding: 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.payment-method-buttons button.active {
+    background-color: #4CAF50;
+    color: white;
+}
+
+.success-message {
+    color: #4CAF50;
+    margin-bottom: 10px;
+    text-align: center;
+    font-weight: bold;
+}
+
+.submit-button {
+    margin-top: 20px;
 }
 </style>
