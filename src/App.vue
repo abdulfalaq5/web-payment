@@ -3,6 +3,7 @@ import { ref, onMounted } from 'vue';
 import api from './api';
 import Withdrawal from './components/Withdrawal.vue';
 import Balance from './components/Balance.vue';
+import TransactionHistory from './components/TransactionHistory.vue';
 
 const orderId = ref('');
 const amount = ref('');
@@ -200,10 +201,19 @@ onMounted(async () => {
             >
                 Withdrawal
             </button>
+            <button 
+                :class="{ active: currentPage === 'history' }" 
+                @click="currentPage = 'history'"
+            >
+                Riwayat Transaksi
+            </button>
         </div>
 
         <!-- Balance Component -->
         <Balance v-if="currentPage === 'balance'" />
+
+        <!-- Transaction History Component -->
+        <TransactionHistory v-if="currentPage === 'history'" />
 
         <!-- Deposit Form -->
         <div v-if="currentPage === 'deposit'">
